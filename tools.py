@@ -72,13 +72,13 @@ class rv_from_cdf(object):
     def __init__(self, support, cdf, inv_cdf=None, pdf=None, mean=None):
         self.support = np.sort(support)
 
-        if np.allclose(cdf(support[1]), 1) and np.allclose(cdf(support[0]-1e-8), 0):
+        if np.allclose(cdf(support[1]), 1) and np.allclose(cdf(support[0]-1e-10), 0):
             self._cdf = cdf
         else:
             raise ValueError("Wrong support bounds or wrong CDF")
 
         if inv_cdf:
-            if np.allclose(inv_cdf(1), support[1]) and np.allclose(cdf(0), support[0]-1e-8):
+            if np.allclose(inv_cdf(1), support[1]) and np.allclose(cdf(0), support[0]-1e-10):
                 self._inv_cdf = inv_cdf
             else:
                 raise ValueError("Wrong support bounds or wrong inverse CDF")
@@ -88,7 +88,10 @@ class rv_from_cdf(object):
         self._mean = mean
 
     def cdf(self, x):
-        return self._cdf(x)
+        res = self._cdf(x) * (x >= self.support[0]) * (x < self.support[1])
+        res += 1 * (x >= self.support[1])
+        res += 0 * (x < self.support[0])
+        return res
 
     def sf(self, x):
         return 1 - self.cdf(x)
@@ -114,7 +117,14 @@ class rv_from_cdf(object):
         if self._mean:
             return self._mean
         else:
-            return quad(lambda x: x*self.pdf(x), self.support[0], self.support[1])[0]
+            pos_part = quad(lambda x: 1 - self.cdf(x), 0, self.support[1])[0]
+            neg_part = quad(lambda x: self.cdf(-x), 0, -self.support[0])[0]
+            if self.support[0] >= 0:
+                return pos_part
+            elif self.support[1] <= 0:
+                return -neg_part
+            else:
+                return pos_part - neg_part
         
 
 
